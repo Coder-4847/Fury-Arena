@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101511">
+  <meta name="description" content="Fury Arena — a procedural 3D fighter. Step into the ring.">
+  <title>Fury Arena</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <canvas id="arena" aria-label="Fury Arena 3D fighting arena"></canvas>
+  <div id="loading" class="loading"><div class="wordmark">FURY<span>ARENA</span><i>®</i></div><div class="loader"></div><p>SETTING THE STAGE</p></div>
+  <main id="ui"></main>
+  <div id="touch" aria-label="Touch controls" hidden></div>
+  <div id="toast" role="status"></div>
+  <div id="error" role="alert" hidden><h1>We couldn’t start the arena.</h1><p id="error-message"></p><button onclick="location.reload()">Try again</button></div>
+  <script>
+    window.addEventListener('error', event => {
+      if (!event.message) return;
+      document.getElementById('error').hidden = false;
+      document.getElementById('error-message').textContent = event.message;
+      document.getElementById('loading').hidden = true;
+    });
+  </script>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
