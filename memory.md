@@ -55,3 +55,6 @@ Only movement is implemented at the foundation phase. Combat mappings are reserv
 ## Resume instructions
 If you are a new AI reading this: read this file, run the static server, inspect git status, and verify the current build in a browser. Continue Phase 2; keep the hardware QA caveat explicit. Follow the phase checklist in order. Keep each phase playable, update this file and commit after significant milestones. Never mark hardware testing or commercial quality as achieved without evidence. Prepare deployment only; ask for the user's test confirmation before publishing.
 
+
+### Phase 2 implementation checkpoint
+Two distinct articulated rigs (Kade/lime and Nyx/lilac), frame-rate-independent pose blending, two-link leg posing, breathing/scarf motion, anticipation/strike/recovery pose foundation, facing blend, state/event hooks, guard/crouch/dodge/land logic. Browser visually verified both rigs; movement tests pass. Hit/knockdown/get-up poses are prepared for Phase 3 activation. Foot planting/turn polish and physical device QA remain open; do not claim commercial animation parity. New files: src/data/fighters.js (fighter identity/stats), src/world/rig.js (procedural mesh hierarchy and pose blending). Current work: Phase 3 combat, to exercise all reaction states.

@@ -3,12 +3,15 @@ import { FixedLoop } from './core/loop.js';
 import { Input } from './core/input.js';
 import { ArenaScene } from './world/scene.js';
 import { Mover } from './world/mover.js';
+import { FighterRig } from './world/rig.js';
+import { FIGHTERS } from './data/fighters.js';
 
 const scene=new ArenaScene(document.getElementById('arena'));
 const input=new Input(scene.renderer.domElement);
 const mover=new Mover(-2);
-const body=new THREE.Mesh(new THREE.CapsuleGeometry(0.35,1.1,8,16),new THREE.MeshStandardMaterial({color:'#d9fc66',roughness:0.55}));
-body.castShadow=true; scene.scene.add(body);
+const rig=new FighterRig(FIGHTERS[0]);scene.scene.add(rig.root);
+const rival=new Mover(2);rival.facing=-1;
+const rivalRig=new FighterRig(FIGHTERS[1]);scene.scene.add(rivalRig.root);
 let screen='title';
 const ui=document.getElementById('ui');
 function show(next) {
@@ -37,8 +40,8 @@ function update(dt) {
   }
   input.end();
 }
-new FixedLoop(update,(alpha)=>{
-  body.position.set(mover.previousX+(mover.x-mover.previousX)*alpha,0.91+mover.previousY+(mover.y-mover.previousY)*alpha,0);
+new FixedLoop(update,(alpha,dt)=>{
+  rig.render(mover,alpha,dt);rival.age+=dt;rivalRig.render(rival,alpha,dt);
   scene.render();
 }).start();
 show('title'); document.getElementById('loading').hidden=true;
