@@ -1,0 +1,24 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {InkFighter,InkAI,MOVES,resolveInkCombat,neutral} from '../src/ink/combat.js';
+const pair=()=>[new InkFighter(-50,0),new InkFighter(50,1)];
+function active(f,key){f.ink=100;f.start(key);f.attack.t=MOVES[key].start+.01;}
+const held=(...actions)=>({is:a=>actions.includes(a),consume:()=>false});
+test('2D: high punches miss ducks, body blows connect',()=>{const [a,b]=pair();b.duck=true;active(a,'jab');resolveInkCombat([a,b],1);assert.equal(b.health,100);active(a,'low');resolveInkCombat([a,b],2);assert.equal(b.health,94);});
+test('2D: standing guard loses to sweep; crouch guard blocks it',()=>{let [a,b]=pair();b.guard=true;b.guardAge=1;active(a,'sweep');resolveInkCombat([a,b],1);assert.equal(b.health,90);[a,b]=pair();b.guard=true;b.duck=true;b.guardAge=1;active(a,'sweep');resolveInkCombat([a,b],1);assert.equal(b.health,99);});
+test('2D: timed parry negates damage and opens counter window',()=>{const [a,b]=pair();b.guard=true;b.guardAge=.05;active(a,'jab');resolveInkCombat([a,b],1);assert.equal(b.health,100);assert.ok(a.stun>0);assert.equal(a.attack,null);});
+test('2D: invulnerable dodge avoids strikes',()=>{const [a,b]=pair();b.invuln=.2;active(a,'palm');resolveInkCombat([a,b],1);assert.equal(b.health,100);});
+test('2D: strike cannot deal damage twice in its active window',()=>{const [a,b]=pair();active(a,'jab');resolveInkCombat([a,b],1);resolveInkCombat([a,b],1.01);assert.equal(b.health,95);});
+test('2D: simultaneous strikes trade',()=>{const [a,b]=pair();active(a,'jab');active(b,'jab');resolveInkCombat([a,b],1);assert.equal(a.health,95);assert.equal(b.health,95);});
+test('2D: close throws bypass guard',()=>{const [a,b]=pair();b.x=10;b.guard=true;b.guardAge=.05;active(a,'throw');resolveInkCombat([a,b],1);assert.equal(b.health,86);assert.ok(b.knocked);});
+test('2D: spirit attack requires and consumes meter',()=>{const [a]=pair();assert.equal(a.start('special'),false);a.ink=100;assert.equal(a.start('special'),true);assert.equal(a.ink,40);});
+test('2D: jump lands on clear floor and cannot double jump',()=>{const [a,b]=pair();const jump={is:()=>false,consume:key=>key==='jump'};a.tick(1/60,jump,b);assert.ok(a.vy>0);for(let i=0;i<150;i++)a.tick(1/60,neutral,b);assert.equal(a.y,0);assert.equal(a.grounded,true);});
+test('2D: arena has only floor and outer bounds, no obstacle collision',()=>{const [a,b]=pair();b.x=-400;for(let i=0;i<600;i++)a.tick(1/60,held('right'),b);assert.equal(a.x,495);assert.equal(a.y,0);for(let i=0;i<600;i++)a.tick(1/60,held('left'),b);assert.equal(a.x,-495);});
+test('2D: jumping over opponent does not force ground separation',()=>{const [a,b]=pair();a.x=0;b.x=0;a.y=150;resolveInkCombat([a,b],1);assert.equal(a.x,0);assert.equal(b.x,0);});
+test('2D: every attack completes recovery and releases control',()=>{for(const key of Object.keys(MOVES)){const [a,b]=pair();a.ink=100;a.start(key);for(let i=0;i<120;i++)a.tick(1/60,neutral,b);assert.equal(a.attack,null,key);assert.equal(a.state,'idle',key);}});
+test('2D: dodge and knockdown both release movement; reset clears knockdown',()=>{const [a,b]=pair();a.tick(1/60,{is:()=>false,consume:k=>k==='dodge'},b);assert.equal(a.state,'dodge');for(let i=0;i<60;i++)a.tick(1/60,neutral,b);assert.equal(a.state,'idle');a.knocked=true;a.stun=.4;for(let i=0;i<70;i++)a.tick(1/60,neutral,b);assert.equal(a.state,'idle');a.knocked=true;a.reset(0);assert.equal(a.knocked,false);});
+test('2D: a downed opponent has a low hurtbox',()=>{const [a,b]=pair();b.state='down';active(a,'jab');resolveInkCombat([a,b],1);assert.equal(b.health,100);active(a,'sweep');resolveInkCombat([a,b],2);assert.equal(b.health,90);});
+
+test('2D: a real jump can clear and cross an opponent',()=>{const [a,b]=pair();a.x=-120;b.x=0;let apex=0;for(let i=0;i<55;i++){a.tick(1/60,{is:k=>k==='right',consume:k=>i===0&&k==='jump'},b);resolveInkCombat([a,b],i/60);apex=Math.max(apex,a.y);}assert.ok(apex>115);assert.ok(a.x>b.x);});
+test('2D: connected jab chains into cross, a whiff cannot cancel',()=>{const [a,b]=pair();active(a,'jab');resolveInkCombat([a,b],1);a.attack.t=.20;a.tick(1/60,{is:()=>false,consume:k=>k==='light'},b);assert.equal(a.attack.key,'cross');a.start('jab');a.attack.t=.20;a.tick(1/60,{is:()=>false,consume:k=>k==='light'},b);assert.equal(a.attack.key,'jab');});
+test('2D: seeded sparring reaches a KO with finite grounded state',()=>{let seed=12345;const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};const a=new InkFighter(-185,0),b=new InkFighter(185,1),ais=[new InkAI(random),new InkAI(random)];for(let i=0;i<18000&&a.health>0&&b.health>0;i++){a.tick(1/60,ais[0].update(1/60,a,b),b);b.tick(1/60,ais[1].update(1/60,b,a),a);resolveInkCombat([a,b],i/60);assert.ok(Number.isFinite(a.x)&&Number.isFinite(b.y));}assert.ok(a.health===0||b.health===0);});
