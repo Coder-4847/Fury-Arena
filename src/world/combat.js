@@ -1,18 +1,19 @@
 export function resolveAttack(attacker,defender,onImpact,attack=attacker.attack){
   if(!attack)return false;
   const move=attack.move;
-  if(attack.time<move.startup||attack.time>move.startup+move.active||attack.hitTargets.has(defender.team)||defender.health<=0||defender.invulnerable>0)return false;
+  if(attack.time<move.startup||attack.time>move.startup+move.active||attack.hitTargets.has(defender.team)||defender.health<=0||defender.invulnerable>0||defender.downTime>0)return false;
   const dx=(defender.x-attacker.x)*attacker.facing;
   if(dx<-.2||dx>move.range+.3||Math.abs(defender.y-attacker.y)>(move.height||1.25))return false;
   if(move.unblockable&&(!defender.grounded||!attacker.grounded))return false;
   const blocked=defender.blocking&&!move.unblockable&&defender.facing===-attacker.facing;
   attack.hitTargets.add(defender.team);attack.connected=true;
   const damage=blocked?Math.max(1,Math.floor(move.damage*.13)):Math.round(move.damage*attacker.definition.power);
+  const continuation=defender.stun>0;
   defender.health=Math.max(0,defender.health-damage);defender.stun=blocked?.12:move.stun;
   defender.vx=attacker.facing*move.push*(blocked?.25:1);defender.attack=null;
   if(!blocked){
     defender.vy=move.launch||0;defender.downTime=move.knockdown?.85:0;
-    attacker.combo++;attacker.comboTime=1.1;
+    attacker.combo=continuation?attacker.combo+1:1;attacker.comboTime=1.1;
   }
   attacker.meter=Math.min(100,attacker.meter+(blocked?3:move.meter));
   defender.meter=Math.min(100,defender.meter+(blocked?3:damage*.65));

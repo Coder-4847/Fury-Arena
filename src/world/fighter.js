@@ -10,8 +10,10 @@ export class Fighter extends Mover {
   reset(x){
     this.x=this.previousX=x;this.y=this.previousY=0;this.vx=this.vy=0;this.health=100;this.attack=null;
     this.stun=this.downTime=this.invulnerable=this.combo=this.comboTime=0;this.grounded=true;this.setState('idle');
+    this.interaction=null;
   }
   update(dt,input,bound,opponent){
+    if(this.interaction&&this.stun<=0&&this.health>0){this.age+=dt;return;}
     this.invulnerable=Math.max(0,this.invulnerable-dt);this.comboTime=Math.max(0,this.comboTime-dt);
     if(this.comboTime===0)this.combo=0;
     this.blocking=input.is('block')&&this.grounded&&!this.attack&&this.stun<=0;

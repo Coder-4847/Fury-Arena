@@ -25,6 +25,7 @@ export class Mover {
     this.x=Math.max(-bound,Math.min(bound,this.x+this.vx*dt));
     this.y+=this.vy*dt;
     if(this.y<=0) { this.y=0; this.vy=0; if(!this.grounded){this.setState('land');this.onEvent('land');} this.grounded=true; }
+    else this.grounded=false;
     if((this.state==='dodge'&&this.stateTime<.32)||(this.state==='land'&&this.stateTime<.12))return;
     this.setState(!this.grounded?(this.vy>0?'jump':'fall'):guarding?'block':crouching?'crouch':Math.abs(this.vx)>0.15?'run':'idle');
   }

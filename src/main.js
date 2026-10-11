@@ -9,6 +9,8 @@ import { resolveCombat, separateFighters } from './world/combat.js';
 import { FIGHTERS } from './data/fighters.js';
 import { HUD } from './ui/hud.js';
 import { WeaponSystem } from './world/weapons.js';
+import { MAPS } from './data/maps.js';
+import { MapWorld } from './world/maps.js';
 
 const scene=new ArenaScene(document.getElementById('arena'));
 const input=new Input(scene.renderer.domElement),audio=new AudioSystem(),effects=new Effects(scene.scene);
@@ -21,22 +23,25 @@ const ui=document.getElementById('ui'),hud=new HUD(ui);
 const neutral={is:()=>false,consume:()=>false};
 const toast=(message)=>{const el=document.getElementById('toast');el.textContent=message;el.classList.add('visible');clearTimeout(toast.timeout);toast.timeout=setTimeout(()=>el.classList.remove('visible'),2200);};
 const weapons=new WeaponSystem(scene.scene,rigs,impact,message=>{toast(message);audio.play('pickup');});
+const world=new MapWorld(scene,impact,toast,weapons);let selectedMap=MAPS[0];world.load(selectedMap);
 function begin(){rounds=[0,0];fighters.forEach(f=>f.meter=20);newRound();show('arena');}
-function newRound(){fighters.forEach((f,i)=>f.reset(i?2.5:-2.5));fighters[0].facing=1;fighters[1].facing=-1;timer=99;stage='intro';stageTime=0;hitStop=0;effects.clear();weapons.reset(fighters);}
+function newRound(){fighters.forEach((f,i)=>f.reset(i?2.5:-2.5));fighters[0].facing=1;fighters[1].facing=-1;timer=99;stage='intro';stageTime=0;hitStop=0;effects.clear();weapons.reset(fighters);world.load(selectedMap);}
 function show(next){
   if(next==='controls')returnScreen=screen;
   screen=next;input.flush();input.menu=screen!=='arena';input.showTouch(screen==='arena');
   if(screen==='title')ui.innerHTML=`<header><a class="brand" href="./">FURY<span>ARENA</span><i>®</i></a><div class="build-tag"><b></b> COMBAT LAB / 03</div></header><section class="title-screen"><div class="eyebrow">THE ARENA IS YOURS</div><h1>MAKE<br>YOUR<span>IMPACT.</span></h1><p>A new breed of arena fighter.<br>No limits. Just fight.</p><button class="primary" data-command="start">ENTER THE ARENA <span>↗</span></button><button class="text-button" data-go="controls">CONTROLS & INFO <span>→</span></button></section><footer><span>01 / THE TRAINING FLOOR</span><span>3D FIGHTING. PURE INSTINCT.</span><span class="input-hint">ENTER TO START</span></footer>`;
   if(screen==='arena'){hud.mount(fighters);hud.announce(stage==='intro'?'ROUND '+(rounds[0]+rounds[1]+1):'');}
+  if(screen==='maps')ui.innerHTML=`<section class="overlay"><div class="menu-card wide"><span class="eyebrow">CHOOSE YOUR BATTLEGROUND</span><h2>THE ARENAS.</h2><div class="select-grid">${MAPS.map((map,i)=>`<button class="map-card" data-map="${i}" style="--map-color:${map.color}"><span class="card-number">0${i+1}</span><b>${map.name}</b><small>${map.description}</small></button>`).join('')}</div><button data-go="title">BACK</button></div></section>`;
   if(screen==='pause')ui.innerHTML=`<section class="overlay"><div class="menu-card"><span class="eyebrow">TAKE A BREATHER</span><h2>PAUSED.</h2><button class="primary" data-go="arena">RESUME <span>→</span></button><button data-command="dummy">PARTNER: ${dummy.toUpperCase()} <span>→</span></button><button data-go="controls">CONTROLS</button><button data-command="start">RESTART MATCH</button><button data-go="title">BACK TO TITLE</button></div></section>`;
   if(screen==='results')ui.innerHTML=`<section class="overlay results"><div class="menu-card"><span class="eyebrow">THE ARENA HAS SPOKEN</span><h2>${winner<0?'DRAW':fighters[winner].definition.name+' WINS.'}</h2><p>${rounds[0]} — ${rounds[1]} / BEST OF THREE</p><button class="primary" data-command="start">RUN IT BACK <span>↗</span></button><button data-go="title">BACK TO TITLE</button></div></section>`;
   if(screen==='controls')ui.innerHTML=`<section class="overlay"><div class="menu-card wide"><span class="eyebrow">KNOW YOUR TOOLS</span><h2>CONTROLS.</h2><div class="controls-table"><div><b>A / D · ← / →</b><span>Move / menu navigation</span></div><div><b>Space · S / ↓</b><span>Jump · crouch</span></div><div><b>J / K / L · Mouse L / R / M</b><span>Light / heavy / kick</span></div><div><b>Shift / Q / E</b><span>Guard / dodge / throw</span></div><div><b>R · ↑ or ↓ + R</b><span>50-meter special · 40-meter special</span></div><div><b>J → J → J</b><span>Chain on hit during recovery</span></div><div><b>Esc · Pad Menu</b><span>Pause / back</span></div></div><p>Gamepad: stick or D-pad move; A/✕ jump; X/□ light; Y/△ heavy; RB/R1 kick; LB/L1 guard; B/○ dodge; LT/L2 grab; RT/R2 special. Hold stick up/down for your alternate special. A confirms menus; B returns. Touch controls appear on touch devices. Pause to change the training partner between idle, block and attack.</p><button class="primary" data-command="back">BACK <span>←</span></button></div></section>`;
   ui.querySelectorAll('[data-go]').forEach(button=>button.addEventListener('click',()=>{audio.unlock();audio.play('menu');show(button.dataset.go);}));
   ui.querySelectorAll('[data-command]').forEach(button=>button.addEventListener('click',()=>{
     audio.unlock();audio.play('menu');const command=button.dataset.command;
-    if(command==='start')begin();if(command==='back')show(returnScreen);
+    if(command==='start'){if(screen==='title')show('maps');else begin();}if(command==='back')show(returnScreen);
     if(command==='dummy'){dummy=['attack','idle','block'][(['attack','idle','block'].indexOf(dummy)+1)%3];show('pause');}
   }));
+  ui.querySelectorAll('[data-map]').forEach(button=>button.addEventListener('click',()=>{selectedMap=MAPS[Number(button.dataset.map)];audio.unlock();audio.play('menu');begin();}));
   if(screen!=='arena')ui.querySelector('button')?.focus({preventScroll:true});else document.activeElement?.blur();
 }
 input.onPause=()=>{if(screen==='arena')show('pause');};
@@ -64,20 +69,21 @@ function update(dt){
     if(hitStop>0){hitStop-=dt;input.end();return;}
     stageTime+=dt;
     if(stage==='intro'){
-      hud.announce(stageTime<1?'ROUND '+(rounds[0]+rounds[1]+1):'FIGHT!',stageTime<1?'THE TRAINING FLOOR':'');
+      hud.announce(stageTime<1?'ROUND '+(rounds[0]+rounds[1]+1):'FIGHT!',stageTime<1?selectedMap.name:'');
       if(stageTime>1.8){stage='fight';stageTime=0;hud.announce('');input.flush();}
     } else if(stage==='fight'){
       timer=Math.max(0,timer-dt);
-      weapons.handle(fighters[0],input);
-      fighters[0].update(dt,input,10,fighters[1]);fighters[1].update(dt,dummyInput(dt),10,fighters[0]);
-      separateFighters(...fighters,10);resolveCombat(fighters[0],fighters[1],impact);weapons.update(dt,fighters);
-      document.getElementById('match-caption').textContent=fighters[0].weapon?`${fighters[0].weapon.definition.name} / ${fighters[0].weapon.remaining} ${fighters[0].weapon.definition.ammo?'AMMO':'USES'} · G THROW · ↓+G DROP`:'F PICK UP / USE · G THROW · ↓+G DROP';
+      world.handle(fighters[0],input);weapons.handle(fighters[0],input);
+      fighters[0].update(dt,input,selectedMap.bound,fighters[1]);fighters[1].update(dt,dummyInput(dt),selectedMap.bound,fighters[0]);
+      fighters.forEach(f=>world.physics(f));world.update(dt,fighters);
+      separateFighters(...fighters,selectedMap.bound);resolveCombat(fighters[0],fighters[1],impact);weapons.update(dt,fighters);
+      document.getElementById('match-caption').textContent=world.hint(fighters[0])||(fighters[0].weapon?`${fighters[0].weapon.definition.name} / ${fighters[0].weapon.remaining} ${fighters[0].weapon.definition.ammo?'AMMO':'USES'} · G THROW · ↓+G DROP`:'F PICK UP / USE · G THROW · ↓+G DROP');
       if(fighters.some(f=>f.health<=0)||timer===0){
         stage='ko';stageTime=0;winner=fighters[0].health===fighters[1].health?-1:fighters[0].health>fighters[1].health?0:1;
         if(winner>=0)rounds[winner]++;audio.play('ko');hud.announce(timer===0?'TIME UP':'K.O.',winner<0?'DRAW':fighters[winner].definition.name+' TAKES THE ROUND');
       }
     } else if(stage==='ko'){
-      fighters.forEach((f,i)=>f.update(dt,neutral,10,fighters[1-i]));
+      fighters.forEach((f,i)=>{f.update(dt,neutral,selectedMap.bound,fighters[1-i]);world.physics(f);});
       if(stageTime>2.6){if(rounds.some(r=>r>=2))show('results');else{newRound();hud.trail=[100,100];}}
     }
     if(screen==='arena')hud.update(fighters,timer,rounds,dt);

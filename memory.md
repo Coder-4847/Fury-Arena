@@ -87,3 +87,6 @@ Read this file, git status and changed source. Start/reuse server, run npm test,
 ### Phase 4 implementation checkpoint
 Added src/data/weapons.js (eight parameterized weapon definitions) and src/world/weapons.js (procedural models, indicated timed drops, equipment, durability/ammo, thrown and fired projectiles with swept X collision). Integrated F use/pickup, G throw, down+G drop; melee/ranged attack overrides. tests/weapons.test.js covers all eight equipment lifecycles and projectile direction after owner turns. Nineteen tests pass. Browser pickup verification in progress. Next: Phase 5 after verification; keep weapon balance on final QA list.
 
+
+### Phase 5 checkpoint
+Added src/data/maps.js (Gym/Dojo/Rooftop/Foundry, bounds/platforms/objects/hazards/spawns) and src/world/maps.js (environment construction, platform collision, timed climb/swing interactions, throwable props, breakable panel, gong/press triggers, telegraphed hazards). Arena selection works; Gym browser rendered and ran combat with no errors. Twenty-one tests pass, including platform landing/walk-off and interaction release. Corrected combo counter to count actual hitstun continuations, and prevented hits on downed fighters. Main source still needs extraction as menus/modes grow. Current phase: 6 next. Final QA must review all map interactions on devices.

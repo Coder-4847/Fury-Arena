@@ -88,6 +88,8 @@ export class FighterRig {
     if(fighter.state==='hit') {p.lean=.4;p.head=.25;p.a0=-.2;p.a1=.4;}
     if(fighter.state==='knockdown') {p.hipY=.3;p.lean=1.25;p.head=.2;p.l0=-.6;p.l1=-.2;}
     if(fighter.state==='getup') {p.hipY=.6;p.lean=.55;p.l0=-1;p.k0=1.5;p.l1=.3;p.k1=.8;}
+    if(fighter.state==='climb'){p.a0=2.7;p.a1=2.4;p.e0=.3;p.e1=.4;p.l0=-.7;p.k0=1.4;p.l1=.6;p.k1=1.2;}
+    if(fighter.state==='swing'){p.a0=3;p.a1=3;p.e0=.1;p.e1=.1;p.l0=1.2;p.l1=1.5;p.k0=.2;p.k1=.1;p.lean=.2;}
     if(fighter.attack) this.attackPose(p,fighter);
     if(!this.lastGround && fighter.grounded)this.land=1;
     this.lastGround=fighter.grounded;this.land=Math.max(0,this.land-dt*7);
