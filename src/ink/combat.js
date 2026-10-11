@@ -1,3 +1,4 @@
+import { beginSequence, stepSequences, canFinish } from './sequences.js';
 export const MOVES = {
  jab:{name:'Straight fist',duration:.32,start:.08,end:.14,range:105,height:137,damage:5,stun:.20,push:45,pose:'jab',chain:'cross'},
  cross:{name:'Cross',duration:.38,start:.1,end:.17,range:116,height:131,damage:7,stun:.25,push:70,pose:'cross',chain:'hook'},
@@ -10,18 +11,21 @@ export const MOVES = {
  sweep:{name:'Reaping sweep',duration:.66,start:.23,end:.33,range:150,height:25,damage:10,stun:.7,push:140,knock:true,pose:'sweep',low:true},
  airjab:{name:'Falling fist',duration:.4,start:.1,end:.2,range:105,height:104,damage:7,stun:.25,push:80,pose:'airjab'},
  airkick:{name:'Flying side kick',duration:.58,start:.13,end:.31,range:156,height:75,damage:12,stun:.36,push:180,pose:'airkick'},
- throw:{name:'Shoulder throw',duration:.76,start:.2,end:.28,range:66,height:75,damage:14,stun:.8,push:210,lift:220,knock:true,unblock:true,pose:'throw'},
+ throw:{name:'Shoulder throw',duration:.76,start:.2,end:.28,range:66,height:75,damage:14,stun:.8,push:210,lift:220,knock:true,unblock:true,grapple:true,pose:'throw'},
+ reap:{name:'Reaping throw',duration:.5,start:.17,end:.25,range:66,height:65,damage:12,stun:.8,pose:'throw',unblock:true,grapple:true},
+ finish:{name:'The Silent Bell',duration:.55,start:.18,end:.28,range:80,height:80,damage:0,pose:'palm',unblock:true,grapple:true},
+ finishLow:{name:'Falling Moon',duration:.55,start:.18,end:.28,range:80,height:65,damage:0,pose:'sweep',unblock:true,grapple:true},
  special:{name:'Thousand winds',duration:.92,start:.29,end:.48,range:220,height:98,damage:24,stun:.7,push:350,lift:180,knock:true,cost:60,pose:'special'},
 };
 export const neutral={is:()=>false,consume:()=>false};
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 export class InkFighter {
  constructor(x,id){this.id=id;this.reset(x);}
- reset(x){Object.assign(this,{x,y:0,px:x,py:0,vx:0,vy:0,facing:this.id?-1:1,health:100,ink:20,state:'idle',clock:0,age:0,stun:0,invuln:0,attack:null,duck:false,guard:false,guardAge:1,combo:0,lastHit:-10,hitFlash:0,grounded:true,knocked:false,landTime:0,dodgeDir:1,trail:[],wins:0});}
+ reset(x){Object.assign(this,{x,y:0,px:x,py:0,vx:0,vy:0,facing:this.id?-1:1,health:100,ink:20,state:'idle',clock:0,age:0,stun:0,invuln:0,attack:null,duck:false,guard:false,guardAge:1,combo:0,lastHit:-10,hitFlash:0,grounded:true,knocked:false,landTime:0,dodgeDir:1,trail:[],wins:0,sequence:null,stride:0,prevStride:0,renderPrevious:null});}
  start(key,emit){const m=MOVES[key];if(!m||this.ink<(m.cost||0))return false;this.ink-=m.cost||0;this.attack={key,m,t:0,hit:false,connected:false};this.state='attack';this.clock=0;emit?.({type:'swing',f:this,move:m});return true;}
  tick(dt,input,other,emit=()=>{}){
-  this.px=this.x;this.py=this.y;this.age+=dt;this.clock+=dt;this.landTime=Math.max(0,this.landTime-dt);this.hitFlash=Math.max(0,this.hitFlash-dt);this.invuln=Math.max(0,this.invuln-dt);this.stun=Math.max(0,this.stun-dt);
-  const wasGround=this.grounded;
+  this.renderPrevious={state:this.state,x:this.x,y:this.y,clock:this.clock,age:this.age,stride:this.stride,attackT:this.attack?.t,attackKey:this.attack?.key};this.px=this.x;this.py=this.y;this.prevStride=this.stride;this.stride+=this.vx*dt/168;this.age+=dt;this.clock+=dt;this.landTime=Math.max(0,this.landTime-dt);this.hitFlash=Math.max(0,this.hitFlash-dt);this.invuln=Math.max(0,this.invuln-dt);this.stun=Math.max(0,this.stun-dt);
+  if(this.sequence)return;const wasGround=this.grounded;
   if(this.y>0||this.vy>0){this.vy-=1450*dt;this.y+=this.vy*dt;if(this.y<=0){this.y=0;this.vy=0;if(!wasGround){this.landTime=.16;emit({type:'land',f:this});}}}this.grounded=this.y===0;
   if(this.health<=0){this.state='ko';this.attack=null;this.vx*=Math.exp(-5*dt);this.x+=this.vx*dt;this.x=clamp(this.x,-495,495);return;}
   if(this.stun>0){this.state=this.knocked?'down':'hit';this.attack=null;this.duck=false;this.guard=false;this.vx*=Math.exp(-5*dt);this.x=clamp(this.x+this.vx*dt,-495,495);return;}
@@ -35,8 +39,9 @@ export class InkFighter {
   if(input.consume('dodge')&&this.grounded){this.state='dodge';this.clock=0;this.dodgeDir=axis||-this.facing;this.invuln=.29;this.guard=false;emit({type:'dodge',f:this});return;}
   if(input.consume('jump')&&this.grounded){this.vy=680;this.grounded=false;this.duck=false;this.guard=false;emit({type:'jump',f:this});}
   let move=null;
-  if(input.consume('special'))move='special';
-  else if(input.consume('grab')&&this.grounded)move='throw';
+  if(input.consume('use')&&canFinish(this,other))move=this.duck?'finishLow':'finish';
+  else if(input.consume('special'))move='special';
+  else if(input.consume('grab')&&this.grounded)move=this.duck?'reap':'throw';
   else if(input.consume('heavy'))move=this.grounded?(this.duck||input.is('up')?'upper':'palm'):'airjab';
   else if(input.consume('kick'))move=this.grounded?(this.duck?'sweep':'kick'):'airkick';
   else if(input.consume('light'))move=this.grounded?(this.duck?'low':input.is('up')?'upper':'jab'):'airjab';
@@ -46,13 +51,13 @@ export class InkFighter {
  }
 }
 export function resolveInkCombat(fighters,time,emit=()=>{}){
- const contacts=[];
- for(const a of fighters){const b=fighters.find(f=>f!==a),s=a.attack;if(!s||s.hit||s.t<s.m.start||s.t>s.m.end||b.health<=0||b.invuln>0)continue;
+ stepSequences(fighters,1/60,emit);const contacts=[];
+ for(const a of fighters){const b=fighters.find(f=>f!==a),s=a.attack;if(a.sequence||b.sequence||!s||s.hit||s.t<s.m.start||s.t>s.m.end||b.health<=0||b.invuln>0)continue;
   const m=s.m,dx=(b.x-a.x)*a.facing,hy=a.y+m.height,hurtTop=b.y+(b.state==='down'||b.state==='ko'?42:b.duck?87:180),hurtBottom=b.y+12;
   if(dx<0||dx>m.range+20||hy<hurtBottom-15||hy>hurtTop+12)continue;
   contacts.push({a,b,s,m,hy});
  }
- for(const {a,b,s,m,hy} of contacts){s.hit=true;s.connected=true;const facing=(a.x-b.x)*b.facing>0;const guarded=b.guard&&facing&&!m.unblock&&(!m.low||b.duck);const parry=guarded&&b.guardAge<.14;
+ for(const {a,b,s,m,hy} of contacts){if(a.sequence||b.sequence)continue;s.hit=true;s.connected=true;if(m.grapple){beginSequence(a,b,s.key,emit);continue;}const facing=(a.x-b.x)*b.facing>0;const guarded=b.guard&&facing&&!m.unblock&&(!m.low||b.duck);const parry=guarded&&b.guardAge<.14;
   if(parry){a.stun=.35;a.attack=null;a.vx=-a.facing*100;b.ink=clamp(b.ink+12,0,100);emit({type:'parry',a,b,hy,move:m});continue;}
   const chained=b.stun>0;const damage=guarded?Math.max(1,Math.floor(m.damage*.12)):m.damage;b.health=Math.max(0,b.health-damage);b.hitFlash=.13;b.clock=0;b.stun=guarded?.12:m.stun;b.vx=a.facing*m.push*(guarded?.35:1);b.guard=guarded;b.attack=null;
   if(!guarded){b.knocked=!!m.knock;b.vy=m.lift||b.vy;b.duck=false; a.combo=chained&&time-a.lastHit<.85?a.combo+1:1;a.lastHit=time;}
@@ -61,7 +66,7 @@ export function resolveInkCombat(fighters,time,emit=()=>{}){
   if(b.health===0){b.clock=0;emit({type:'ko',a,b});}
  }
  // Bodies separate only while both stand on the same plane; jumping can cross over.
- const [a,b]=fighters,dx=b.x-a.x;if(Math.abs(a.y-b.y)<115&&Math.abs(dx)<49&&a.state!=='dodge'&&b.state!=='dodge'){const push=(49-Math.abs(dx))/2,sign=dx>=0?1:-1;a.x=clamp(a.x-push*sign,-495,495);b.x=clamp(b.x+push*sign,-495,495);}
+ const [a,b]=fighters,dx=b.x-a.x;if(!a.sequence&&!b.sequence&&Math.abs(a.y-b.y)<115&&Math.abs(dx)<49&&a.state!=='dodge'&&b.state!=='dodge'){const push=(49-Math.abs(dx))/2,sign=dx>=0?1:-1;a.x=clamp(a.x-push*sign,-495,495);b.x=clamp(b.x+push*sign,-495,495);}
 }
 export class InkAI {
  constructor(random=Math.random){this.random=random;this.timer=0;this.intent='idle';this.held=new Set();this.presses=new Set();}
