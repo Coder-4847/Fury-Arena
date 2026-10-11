@@ -8,6 +8,7 @@ import { Effects } from './world/effects.js';
 import { resolveCombat, separateFighters } from './world/combat.js';
 import { FIGHTERS } from './data/fighters.js';
 import { HUD } from './ui/hud.js';
+import { WeaponSystem } from './world/weapons.js';
 
 const scene=new ArenaScene(document.getElementById('arena'));
 const input=new Input(scene.renderer.domElement),audio=new AudioSystem(),effects=new Effects(scene.scene);
@@ -19,8 +20,9 @@ let screen='title',returnScreen='title',dummy='attack',hitStop=0,timer=99,rounds
 const ui=document.getElementById('ui'),hud=new HUD(ui);
 const neutral={is:()=>false,consume:()=>false};
 const toast=(message)=>{const el=document.getElementById('toast');el.textContent=message;el.classList.add('visible');clearTimeout(toast.timeout);toast.timeout=setTimeout(()=>el.classList.remove('visible'),2200);};
+const weapons=new WeaponSystem(scene.scene,rigs,impact,message=>{toast(message);audio.play('pickup');});
 function begin(){rounds=[0,0];fighters.forEach(f=>f.meter=20);newRound();show('arena');}
-function newRound(){fighters.forEach((f,i)=>f.reset(i?2.5:-2.5));fighters[0].facing=1;fighters[1].facing=-1;timer=99;stage='intro';stageTime=0;hitStop=0;effects.clear();}
+function newRound(){fighters.forEach((f,i)=>f.reset(i?2.5:-2.5));fighters[0].facing=1;fighters[1].facing=-1;timer=99;stage='intro';stageTime=0;hitStop=0;effects.clear();weapons.reset(fighters);}
 function show(next){
   if(next==='controls')returnScreen=screen;
   screen=next;input.flush();input.menu=screen!=='arena';input.showTouch(screen==='arena');
@@ -66,8 +68,10 @@ function update(dt){
       if(stageTime>1.8){stage='fight';stageTime=0;hud.announce('');input.flush();}
     } else if(stage==='fight'){
       timer=Math.max(0,timer-dt);
+      weapons.handle(fighters[0],input);
       fighters[0].update(dt,input,10,fighters[1]);fighters[1].update(dt,dummyInput(dt),10,fighters[0]);
-      separateFighters(...fighters,10);resolveCombat(fighters[0],fighters[1],impact);
+      separateFighters(...fighters,10);resolveCombat(fighters[0],fighters[1],impact);weapons.update(dt,fighters);
+      document.getElementById('match-caption').textContent=fighters[0].weapon?`${fighters[0].weapon.definition.name} / ${fighters[0].weapon.remaining} ${fighters[0].weapon.definition.ammo?'AMMO':'USES'} · G THROW · ↓+G DROP`:'F PICK UP / USE · G THROW · ↓+G DROP';
       if(fighters.some(f=>f.health<=0)||timer===0){
         stage='ko';stageTime=0;winner=fighters[0].health===fighters[1].health?-1:fighters[0].health>fighters[1].health?0:1;
         if(winner>=0)rounds[winner]++;audio.play('ko');hud.announce(timer===0?'TIME UP':'K.O.',winner<0?'DRAW':fighters[winner].definition.name+' TAKES THE ROUND');

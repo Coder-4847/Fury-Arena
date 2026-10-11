@@ -34,7 +34,7 @@ export class Fighter extends Mover {
       let selected=null;
       if(input.consume('special')){const variant=input.is('up')||input.is('down')?2:1;selected=MOVES[this.definition.id+variant];if(this.meter<selected.cost)selected=null;}
       if(!selected&&input.consume('grab')&&this.grounded)selected=MOVES.grab;
-      for(const action of ['heavy','kick','light'])if(!selected&&input.consume(action))selected=this.grounded?MOVES[action]:MOVES.air;
+      for(const action of ['heavy','kick','light'])if(!selected&&input.consume(action))selected=this.grounded?(this.weapon&&this.weapon.remaining>0&&action!=='kick'?this.weapon.definition.move:MOVES[action]):MOVES.air;
       if(selected)this.startAttack(selected);
     }
     super.update(dt,this.attack?none:input,bound);

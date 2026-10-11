@@ -4,7 +4,7 @@
 Procedural Three.js 3D fighter on the X/Y plane; gameplay Z=0. Plain JavaScript ES modules, no build step. `npm start` / `node serve.mjs`, then http://127.0.0.1:4173. Three.js 0.180.0 vendored with MIT license. No external art/fonts. All paths relative; `.nojekyll` included. **Never deploy before the user confirms it works.**
 
 ## Current status — 2026-10-11
-Resumed after the user's usage interruption. Phase 1 committed as 5c1cc06. Phase 2 implementation checkpoint committed as 601750e. Phase 3 combat implemented; browser round-flow verified through NYX WINS 0–2, with no warnings/errors. Ten deterministic tests pass. No browser errors/warnings in the combat smoke test. Camera now frames both fighters dynamically; simultaneous hits trade fairly. Next: complete Phase 3 verification and commit, then Phase 4 weapons. Do not describe the game as publishable yet.
+Resumed after the user's usage interruption. Phase 1 committed as 5c1cc06. Phase 2 implementation checkpoint committed as 601750e. Phase 3 combat implemented; browser round-flow verified through NYX WINS 0–2, with no warnings/errors. Ten deterministic tests pass. No browser errors/warnings in the combat smoke test. Camera now frames both fighters dynamically; simultaneous hits trade fairly. Phase 3 complete and committed as a6e7c47. Phase 4 implemented and pickup browser-verified; next Phase 5 arena framework. Do not describe the game as publishable yet.
 
 ## Phase checklist
 ### 1 Foundation
@@ -24,7 +24,7 @@ Resumed after the user's usage interruption. Phase 1 committed as 5c1cc06. Phase
 - [x] Idle/block/attack partner in pause menu; best-of-three flow, round intro, KO, results/rematch.
 - [x] Browser full-match verification reached results (NYX WINS 0–2); no warnings/errors. Initial move timings/costs tuned; broader balance testing remains in Phase 8.
 ### 4 Weapons
-- [ ] Timed indicated drops, equip/drop/throw, durability/ammo, eight distinct weapons, playable QA.
+- [x] Timed indicated drops, equip/drop/throw, durability/ammo, eight weapon definitions. Nineteen regression checks pass; browser verified sword pickup/equipped model. Broader weapon balance remains in final QA.
 ### 5 Arenas
 - [ ] Data-driven bounds/camera/platforms/hazards/spawns; interactable framework; swing/throw/climb/break/trigger; first four including Gym; map select; playable QA.
 ### 6 Modes and menus
@@ -77,9 +77,13 @@ Meters and seconds. X horizontal, Y up, Z visual depth only. Previous positions 
 - Animation and combat need continued polish/balance; no commercial-quality claim.
 - Browser verified a complete two-round loss into results; further win/draw edge checks belong in final QA.
 - Procedural portraits are initial letters; replace with real rig renders in menu phase.
-- No weapons, map framework or real modes yet.
+- Map framework and full modes are next; weapons implemented.
 - Browser may still be open with the game and server may still run (local port 4173); reuse them where possible.
 
 ## Resume
 Read this file, git status and changed source. Start/reuse server, run npm test, inspect browser. Finish Phase 3 QA before Phase 4. Keep build playable, update this file after significant changes, commit checkpoints. Git metadata writes require tool sandbox escalation in this environment; regular project edits do not. Never deploy without user confirmation. Do not turn an unchecked hardware/quality claim into a checked deliverable without evidence.
+
+
+### Phase 4 implementation checkpoint
+Added src/data/weapons.js (eight parameterized weapon definitions) and src/world/weapons.js (procedural models, indicated timed drops, equipment, durability/ammo, thrown and fired projectiles with swept X collision). Integrated F use/pickup, G throw, down+G drop; melee/ranged attack overrides. tests/weapons.test.js covers all eight equipment lifecycles and projectile direction after owner turns. Nineteen tests pass. Browser pickup verification in progress. Next: Phase 5 after verification; keep weapon balance on final QA list.
 

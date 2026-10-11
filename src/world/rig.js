@@ -109,7 +109,9 @@ export class FighterRig {
     const recovery=Math.max(0,1-Math.max(0,time-move.startup-move.active)/move.recovery);
     const reach=strike*recovery;
     p.lean=.18*anticipation-.22*reach;
-    if(move.pose==='kick') {p.l1=1.7*reach;p.k1=.2+1.25*anticipation;p.hipY=.96;p.a0=-.2;p.a1=.1;p.lean=.16*reach;}
+    if(move.pose==='slash'||move.pose==='slam'){p.a0=2.9*anticipation+1.1*reach;p.e0=.4;p.lean=-.3*reach;p.hipY=1-.12*reach;}
+    else if(move.pose==='thrust'){p.a0=1.5*reach;p.e0=1.6*(1-reach);p.a1=1;p.e1=.8;p.lean=-.2*reach;}
+    else if(move.pose==='kick') {p.l1=1.7*reach;p.k1=.2+1.25*anticipation;p.hipY=.96;p.a0=-.2;p.a1=.1;p.lean=.16*reach;}
     else if(move.pose==='uppercut') {p.a1=.4+2.1*reach;p.e1=1.2-.6*reach;p.hipY=1-.12*anticipation;}
     else if(move.pose==='spin') {p.l1=1.75*reach;p.k1=.15;p.lean=-.3*reach;this.root.rotation.y=this.turn+reach*Math.PI*2;}
     else {p.a0=.25+1.3*reach-.55*anticipation;p.e0=1.8*(1-reach)+.1*reach;p.a1=.8;p.e1=1.7;}
