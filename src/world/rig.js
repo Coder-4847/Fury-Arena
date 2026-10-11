@@ -65,15 +65,18 @@ export class FighterRig {
     this.root.position.set(fighter.previousX+(fighter.x-fighter.previousX)*alpha,fighter.previousY+(fighter.y-fighter.previousY)*alpha,0);
     const targetTurn=fighter.facing===1?0:Math.PI;
     this.turn=damp(this.turn,targetTurn,20,dt);this.root.rotation.y=this.turn;
-    this.phase+=Math.abs(fighter.vx)*dt*5.5;
+    this.phase+=Math.abs(fighter.vx)*dt*Math.PI*2/1.28;
     const t=fighter.age,speed=Math.min(1,Math.abs(fighter.vx)/4),breath=Math.sin(t*2.6);
     const p={hipY:1.01+breath*0.012,lean:0.035,head:-0.04,a0:0.35+breath*.035,a1:.78-breath*.025,e0:1.8,e1:1.7,l0:-.32,l1:.38,k0:.22,k1:.2};
     if(fighter.grounded && speed>.08 && !['dodge','crouch','block'].includes(fighter.state)) {
       p.hipY=0.97+Math.abs(Math.sin(this.phase))*0.025;
       p.lean=-fighter.vx*fighter.facing*.035;
       for(let i=0;i<2;i++) {
-        const phase=this.phase+i*Math.PI;
-        const [hip,knee]=this.legIK(Math.cos(phase)*0.34,-0.86+Math.max(0,Math.sin(phase))*.22);
+        const phase=this.phase+i*Math.PI,cycle=(phase/(Math.PI*2))%1;
+        const stance=cycle<.5,u=stance?cycle*2:(cycle-.5)*2;
+        const travelSign=Math.sign(fighter.vx)*fighter.facing;
+        const footX=(stance?.32-u*.64:-.32+u*.64)*travelSign;
+        const [hip,knee]=this.legIK(footX,-.86+(stance?0:Math.sin(u*Math.PI)*.22));
         p['l'+i]=hip;p['k'+i]=knee;
         p['a'+i]=.45+Math.sin(phase)*.35;p['e'+i]=1.55;
       }
