@@ -6,9 +6,11 @@ export const KEYS = {
   Escape: 'pause', Enter: 'confirm', Backspace: 'back',
 };
 export const PAD = { 0: 'jump', 1: 'dodge', 2: 'light', 3: 'heavy', 4: 'block', 5: 'kick', 6: 'grab', 7: 'special', 8: 'use', 9: 'pause', 10: 'drop', 12: 'up', 13: 'down', 14: 'left', 15: 'right' };
+export const PLAYER_TWO_KEYS={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down',Numpad0:'jump',Numpad1:'light',Numpad2:'heavy',Numpad3:'kick',ShiftRight:'block',Numpad4:'dodge',Numpad5:'grab',Numpad6:'special',NumpadDecimal:'use',NumpadDivide:'drop',NumpadEnter:'confirm'};
 
 export class Input {
-  constructor(canvas) {
+  constructor(canvas,options={}) {
+    this.keys=options.keys||KEYS;this.padIndex=options.padIndex||0;this.localVersus=false;
     this.sources = new Map();
     this.held = new Set();
     this.pressed = new Set();
@@ -22,22 +24,23 @@ export class Input {
     this.onDisconnect = () => {};
     this.onDevice = () => {};
     window.addEventListener('keydown', event => {
-      if (event.ctrlKey || event.metaKey || event.altKey || !KEYS[event.code]) return;
+      if (event.ctrlKey || event.metaKey || event.altKey || !this.keys[event.code]) return;
+      if(this.localVersus&&!this.menu&&this.padIndex===0&&(event.code.startsWith('Arrow')||event.code==='ShiftRight'))return;
       if (['INPUT', 'SELECT'].includes(event.target.tagName)) return;
       event.preventDefault();
-      this.set(`key:${event.code}`, KEYS[event.code], true, 'keyboard');
+      this.set(`key:${event.code}`, this.keys[event.code], true, 'keyboard');
     });
-    window.addEventListener('keyup', event => this.set(`key:${event.code}`, KEYS[event.code], false));
+    window.addEventListener('keyup', event => this.set(`key:${event.code}`, this.keys[event.code], false));
     window.addEventListener('blur', () => { this.clear(); this.onPause(); });
     document.addEventListener('visibilitychange', () => { if (document.hidden) { this.clear(); this.onPause(); } });
     canvas.addEventListener('contextmenu', event => event.preventDefault());
     canvas.addEventListener('pointerdown', event => {
-      if (event.pointerType !== 'mouse' || this.menu) return;
+      if (event.pointerType !== 'mouse' || this.menu || options.secondary) return;
       this.set(`mouse:${event.button}`, ['light', 'kick', 'heavy'][event.button], true, 'keyboard');
     });
     window.addEventListener('pointerup', event => this.set(`mouse:${event.button}`, ['light', 'kick', 'heavy'][event.button], false));
     window.addEventListener('gamepaddisconnected', () => { this.clear(); this.onDisconnect(); });
-    this.createTouch();
+    if(!options.secondary)this.createTouch();
   }
   set(source, action, down, device) {
     if (!action) return;
@@ -51,7 +54,7 @@ export class Input {
     this.time += dt;
     const pads = [...(navigator.getGamepads?.() || [])].filter(p => p?.connected);
     this.padCount = pads.length;
-    const pad = pads[0];
+    const pad = pads.find(p=>p.index===this.padIndex);
     for (const [button, action] of Object.entries(PAD)) this.set(`pad:${button}`, action, !!pad?.buttons[button]?.pressed, 'gamepad');
     this.set('axis:left', 'left', (pad?.axes[0] || 0) < -0.3, 'gamepad');
     this.set('axis:right', 'right', (pad?.axes[0] || 0) > 0.3, 'gamepad');
