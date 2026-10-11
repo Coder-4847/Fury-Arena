@@ -29,15 +29,16 @@ Player two: arrows move/duck, numpad 0 jump, 1/2/3 attacks, 4 dodge, 5 throw, 6 
 ## Contents
 
 - One animated shadow martial artist, mirrored opponent.
+- Authored joint rotations keep elbows and knees bending consistently. Strikes load through the hips and shoulders, accelerate into contact, then re-chamber; standing kicks plant the support foot. Damage reach follows the animated fist or foot, with distinct head, body and leg reactions.
 - Thirteen base attacks plus a second throw and two finishers, with move-specific wind-up, contact and recovery poses; footwork, breathing, turning, crouching, jumping, falling, landing compression, guards, rolls, backsteps, stagger, knockdown and recovery.
 - Two original painted sanctuaries: Monastery of Ash and The Moon Garden.
 - Duels (best of three), practice (infinite spirit; still/sparring partner), local two-player, and endurance trials.
-- Interpolated high-refresh movement, distance-driven planted walking steps, constrained limb reach, shorter light-hit stops, cached background rendering; Canvas 2D rendering, drifting leaves and fog, contact shadows, strike trails, afterimages, impact rings, particles, hit-stop and camera shake.
+- Interpolated high-refresh movement, distance-driven planted walking steps, constrained limb reach, shorter light-hit stops, cached background rendering; Canvas 2D rendering, drifting leaves and fog, contact shadows, spirit-strike trails, afterimages, impact rings, particles, hit-stop and camera shake.
 - Parchment-and-ink interface; procedural pentatonic music, drums, swishes and impact sounds.
 
 ## Development
 
-Active entry: `src/ink/main.js`. Combat logic: `src/ink/combat.js`. Paired throw/finisher timelines: `src/ink/sequences.js`. Render interpolation: `src/ink/interpolation.js`. Animated silhouette rig: `src/ink/rig.js`. Scenery/effects: `src/ink/stage.js`. Audio: `src/ink/audio.js`. Styles: `ink.css`. Input/fixed loop reuse the shared core modules.
+Active entry: `src/ink/main.js`. Combat logic: `src/ink/combat.js`. Paired throw/finisher timelines: `src/ink/sequences.js`. Render interpolation: `src/ink/interpolation.js`. Authored strike motion: `src/ink/motion.js`. Animated silhouette rig: `src/ink/rig.js`. Scenery/effects: `src/ink/stage.js`. Audio: `src/ink/audio.js`. Styles: `ink.css`. Input/fixed loop reuse the shared core modules.
 
 `npm test` runs the suite, including dedicated 2D combat regressions. The prior 3D implementation and its tests remain as an inactive historical reference; the current page does not import Three.js or the old world/maps/weapons. Do not confuse those legacy tests with validation of the new game.
 
