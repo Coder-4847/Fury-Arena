@@ -91,6 +91,7 @@ export class FighterRig {
     if(fighter.state==='climb'){p.a0=2.7;p.a1=2.4;p.e0=.3;p.e1=.4;p.l0=-.7;p.k0=1.4;p.l1=.6;p.k1=1.2;}
     if(fighter.state==='swing'){p.a0=3;p.a1=3;p.e0=.1;p.e1=.1;p.l0=1.2;p.l1=1.5;p.k0=.2;p.k1=.1;p.lean=.2;}
     if(fighter.attack) this.attackPose(p,fighter);
+    for(const material of Object.values(this.materials)){material.emissive.set(fighter.state==='hit'?'#7a321f':fighter.attack?.move.cost?'#334015':'#000000');material.emissiveIntensity=fighter.state==='hit'?.65:.3;}
     if(!this.lastGround && fighter.grounded)this.land=1;
     this.lastGround=fighter.grounded;this.land=Math.max(0,this.land-dt*7);
     p.hipY-=this.land*.1;

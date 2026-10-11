@@ -20,7 +20,7 @@ export class Mover {
     }
     if (direction) this.facing=direction;
     this.coyote=this.grounded?0.09:Math.max(0,this.coyote-dt);
-    if (this.coyote>0 && input.consume('jump')) { this.vy=8.6; this.grounded=false; this.coyote=0; }
+    if (this.coyote>0 && input.consume('jump')) { this.vy=8.6; this.grounded=false; this.coyote=0; this.onEvent('jump'); }
     this.vy-=24*dt;
     this.x=Math.max(-bound,Math.min(bound,this.x+this.vx*dt));
     this.y+=this.vy*dt;

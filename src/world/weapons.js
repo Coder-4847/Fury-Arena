@@ -21,7 +21,7 @@ export function weaponModel(id){
 function dispose(group){group.traverse(node=>{node.geometry?.dispose();if(node.material)node.material.dispose();});}
 
 export class WeaponSystem {
-  constructor(scene,rigs,onImpact,onToast){this.scene=scene;this.rigs=rigs;this.onImpact=onImpact;this.onToast=onToast;this.drops=[];this.projectiles=[];this.timer=3;this.sequence=0;this.bound=10;this.interval=9;this.spawnPoints=[-6,0,6];}
+  constructor(scene,rigs,onImpact,onToast,onSound=()=>{}){this.scene=scene;this.rigs=rigs;this.onImpact=onImpact;this.onToast=onToast;this.onSound=onSound;this.drops=[];this.projectiles=[];this.timer=3;this.sequence=0;this.bound=10;this.interval=9;this.spawnPoints=[-6,0,6];}
   reset(fighters){
     for(const drop of this.drops){this.scene.remove(drop.root);dispose(drop.root);}this.drops=[];
     for(const p of this.projectiles){this.scene.remove(p.mesh);dispose(p.mesh);}this.projectiles=[];
@@ -29,11 +29,11 @@ export class WeaponSystem {
   }
   unequip(fighter){if(fighter.weaponMesh){fighter.weaponMesh.removeFromParent();dispose(fighter.weaponMesh);}fighter.weapon=null;fighter.weaponMesh=null;}
   spawn(id,x,delay=1.5,remaining){
-    if(this.drops.length>=5)return;
+    if(this.drops.length>=5){const oldest=this.drops.shift();this.scene.remove(oldest.root);dispose(oldest.root);}
     const root=new THREE.Group(),mesh=weaponModel(id);root.add(mesh);
     const ring=new THREE.Mesh(new THREE.RingGeometry(.35,.4,24),new THREE.MeshBasicMaterial({color:'#d9fc66',side:THREE.DoubleSide,transparent:true,opacity:.75}));ring.rotation.x=-Math.PI/2;ring.position.y=.025;root.add(ring);
     root.position.x=x;mesh.position.y=1.25;mesh.rotation.z=.6;this.scene.add(root);
-    this.drops.push({id,x,root,mesh,ring,delay,age:0,remaining});
+    const drop={id,x,root,mesh,ring,delay,age:0,remaining};this.drops.push(drop);return drop;
   }
   equip(fighter,drop){
     if(fighter.weapon)this.drop(fighter,false);
@@ -57,6 +57,7 @@ export class WeaponSystem {
     }
   }
   projectile(fighter,move,id){
+    this.onSound(['pistol','shotgun'].includes(id)?id:'throw');
     const mesh=move.projectile&&['pistol','shotgun'].includes(id)?new THREE.Mesh(new THREE.BoxGeometry(.24,.045,.045),new THREE.MeshBasicMaterial({color:'#f1ffd0'})):weaponModel(id);
     mesh.position.set(fighter.x+fighter.facing*.5,fighter.y+1.25,.1);this.scene.add(mesh);
     this.projectiles.push({mesh,owner:fighter,move,id,x:mesh.position.x,y:mesh.position.y,startX:mesh.position.x,vx:move.speed*fighter.facing,vy:move.gravity?4:0,age:0});

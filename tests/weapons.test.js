@@ -14,3 +14,5 @@ for(const id of Object.keys(WEAPONS))test(`${id}: spawn, equip, spend a use, dro
   system.reset(fighters);assert.equal(system.projectiles.length,0);assert.equal(system.drops.length,0);assert.equal(f.weapon,null);
 });
 test('projectile hits once even if owner turns after firing',()=>{const {fighters,system}=world();system.projectile(fighters[0],WEAPONS.pistol.move,'pistol');fighters[0].facing=-1;for(let i=0;i<30;i++)system.update(1/60,fighters);assert.equal(fighters[1].health,91);assert.equal(system.projectiles.length,0);});
+
+test('new drops rotate the oldest pickup instead of stalling Weapon Rush',()=>{const {system}=world();for(const id of Object.keys(WEAPONS))system.spawn(id,0,0);assert.equal(system.drops.length,5);assert.equal(system.drops.at(-1).id,'grenade');assert.equal(system.drops[0].id,'knife');});

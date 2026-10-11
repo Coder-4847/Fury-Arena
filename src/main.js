@@ -17,23 +17,26 @@ import { MODES } from './data/modes.js';
 import { HUD } from './ui/hud.js';
 import { Screens } from './ui/screens.js';
 import { createPortraits } from './ui/portraits.js';
+import { Vector3 } from '../vendor/three.module.js';
 
 const scene=new ArenaScene(document.getElementById('arena'));
-const input=new Input(scene.renderer.domElement),input2=new Input(scene.renderer.domElement,{keys:PLAYER_TWO_KEYS,padIndex:1,secondary:true});
+const gamepad=!new URLSearchParams(location.search).has('keyboard-only');
+const input=new Input(scene.renderer.domElement,{gamepad}),input2=new Input(scene.renderer.domElement,{keys:PLAYER_TWO_KEYS,padIndex:1,secondary:true,gamepad});
 const audio=new AudioSystem(),effects=new Effects(scene.scene),ai=new FighterAI();
 const settings=loadSettings(),portraits=createPortraits(FIGHTERS);
+const trailPoint=new Vector3();
 const fighters=[],rigs=[],ui=document.getElementById('ui'),hud=new HUD(ui,portraits),screens=new Screens(ui,action,portraits);
 let screen='title',returnScreen='title',dummy='idle',hitStop=0,timer=99,stage='intro',stageTime=0;
 let mode=MODES[0],selectedMap=MAPS[0],selectedFighters=[0,1],selectPlayer=0,match=new MatchState(mode);
 const neutral={is:()=>false,consume:()=>false};
 const toast=(message)=>{const el=document.getElementById('toast');el.textContent=message;el.classList.add('visible');clearTimeout(toast.timeout);toast.timeout=setTimeout(()=>el.classList.remove('visible'),2200);};
-const weapons=new WeaponSystem(scene.scene,rigs,impact,message=>{toast(message);audio.play('pickup');});
+const weapons=new WeaponSystem(scene.scene,rigs,impact,message=>{toast(message);audio.play('pickup');},name=>audio.play(name));
 const world=new MapWorld(scene,impact,toast,weapons);
 function buildFighters(){
   weapons.reset(fighters);
   for(const rig of rigs){rig.root.removeFromParent();rig.root.traverse(n=>n.geometry?.dispose());Object.values(rig.materials).forEach(m=>m.dispose());}
   fighters.length=rigs.length=0;
-  selectedFighters.forEach((index,i)=>{const def=FIGHTERS[index],fighter=new Fighter(def,i?2.5:-2.5,i),rig=new FighterRig(def);fighter.facing=i?-1:1;fighter.onAttack=move=>audio.play(move.cost?'special':'swing');fighters.push(fighter);rigs.push(rig);scene.scene.add(rig.root);});
+  selectedFighters.forEach((index,i)=>{const def=FIGHTERS[index],fighter=new Fighter(def,i?2.5:-2.5,i),rig=new FighterRig(def);fighter.facing=i?-1:1;fighter.onAttack=move=>audio.play(move.cost?'special':fighter.weapon&&!move.projectile?fighter.weapon.id:'swing');fighter.onEvent=event=>{if(['jump','land','dodge'].includes(event))audio.play(event);};fighters.push(fighter);rigs.push(rig);scene.scene.add(rig.root);});
 }
 function applySettings(){
   audio.setVolume(settings.volume);audio.musicVolume=settings.music;
@@ -41,16 +44,18 @@ function applySettings(){
   input.showTouch(screen==='arena');
   scene.renderer.setPixelRatio(Math.min(devicePixelRatio,{low:1,medium:1.25,high:1.75}[settings.quality]));
   scene.renderer.shadowMap.enabled=settings.quality!=='low';scene.renderer.shadowMap.needsUpdate=true;scene.resize();
+  effects.limit={low:28,medium:64,high:100}[settings.quality];
 }
 function begin(){match=new MatchState(mode);buildFighters();fighters.forEach(f=>f.meter=mode.id==='training'?100:20);weapons.interval=mode.spawnInterval;input.localVersus=mode.id==='local';newRound();show('arena');}
 function newRound(){
   fighters.forEach((f,i)=>{f.reset(i?2.5:-2.5);f.health=match.nextHealth[i];f.facing=i?-1:1;});
-  timer=mode.time;stage='intro';stageTime=hitStop=0;effects.clear();weapons.reset(fighters);world.load(selectedMap);ai.buffer.clear();ai.held.clear();ai.next=0;
+  timer=mode.time;stage='intro';stageTime=hitStop=0;effects.clear();weapons.reset(fighters);world.load(selectedMap);fighters.forEach(f=>world.place(f));audio.bassScale=['temple','dojo','ruins'].includes(selectedMap.id)?.75:1;ai.buffer.clear();ai.held.clear();ai.next=0;
 }
 function show(next){
   const old=screen,focused=document.activeElement?.dataset?.action;
   if((next==='controls'||next==='settings')&&next!==screen)returnScreen=screen;
   screen=next;input.flush();input2.flush();input.menu=input2.menu=screen!=='arena';input.showTouch(screen==='arena');
+  if(screen==='title'){weapons.reset(fighters);effects.clear();fighters.forEach((f,i)=>{f.reset(i?2.5:-2.5);f.facing=i?-1:1;world.place(f);});}
   if(screen==='arena'){hud.mount(fighters,mode);hud.announce(stage==='intro'?'ROUND '+match.round:stage==='ko'?'K.O.':'');}
   else screens.render(screen,{settings,mode,match,fighters,dummy,selectPlayer});
   if(screen!=='arena'){
@@ -130,10 +135,12 @@ new FixedLoop(update,(alpha,dt)=>{
   const running=screen==='arena'&&hitStop<=0,preview=['title','fighters','modes','maps'].includes(screen);
   if(preview)fighters.forEach(f=>f.age+=dt);
   rigs.forEach((rig,i)=>rig.render(fighters[i],running?alpha:1,running||preview?dt:0));
+  if(running)fighters.forEach((f,i)=>{const a=f.attack;if(f.weaponMesh&&a&&a.time>=a.move.startup&&a.time<a.move.startup+a.move.active){rigs[i].root.updateMatrixWorld(true);trailPoint.set(0,-.7,0);f.weaponMesh.localToWorld(trailPoint);effects.trail(trailPoint,i);}});
   effects.update(screen==='arena'?dt:0);
   const shake=screen==='arena'?effects.shake:0,fighting=!preview,gap=Math.abs(fighters[0].x-fighters[1].x),middle=fighting?(fighters[0].x+fighters[1].x)/2:0;
-  const zoom=fighting?Math.max(9,(gap+4.2)/(2*Math.tan(scene.camera.fov*Math.PI/360)*scene.camera.aspect)):innerWidth/innerHeight<1?26:19.5;
+  const elevation=fighting?Math.max(fighters[0].y,fighters[1].y):0;
+  const zoom=fighting?Math.max(9+elevation*.65,(gap+4.2)/(2*Math.tan(scene.camera.fov*Math.PI/360)*scene.camera.aspect)):innerWidth/innerHeight<1?26:19.5;
   const blend=1-Math.exp(-dt*4);scene.camera.position.x+=(middle-scene.camera.position.x)*blend;scene.camera.position.y+=((fighting?3.5:5.8)-scene.camera.position.y)*blend;scene.camera.position.z+=(zoom-effects.punch-scene.camera.position.z)*blend;
-  scene.camera.position.x+=(Math.random()-.5)*shake;scene.camera.position.y+=(Math.random()-.5)*shake;scene.camera.lookAt(scene.camera.position.x,1.1,0);scene.render();
+  scene.camera.position.x+=(Math.random()-.5)*shake;scene.camera.position.y+=(Math.random()-.5)*shake;scene.camera.lookAt(scene.camera.position.x,1.1+elevation*.3,0);scene.render();
 }).start();
-buildFighters();world.load(selectedMap);applySettings();show('title');document.getElementById('loading').hidden=true;
+buildFighters();world.load(selectedMap);fighters.forEach(f=>world.place(f));applySettings();show('title');document.getElementById('loading').hidden=true;

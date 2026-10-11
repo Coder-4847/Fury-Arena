@@ -68,5 +68,9 @@ export class ArenaScene {
     this.camera.position.z = w/h < 1 ? 26 : 19.5;
     this.camera.updateProjectionMatrix();
   }
-  render() { this.renderer.render(this.scene,this.camera); }
+  render() {
+    this.renderer.render(this.scene,this.camera);
+    const now=performance.now();this.frames=(this.frames||0)+1;this.metricsSince??=now;
+    if(now-this.metricsSince>=1000){this.renderer.domElement.dataset.fps=String(Math.round(this.frames*1000/(now-this.metricsSince)));this.renderer.domElement.dataset.drawCalls=String(this.renderer.info.render.calls);this.renderer.domElement.dataset.triangles=String(this.renderer.info.render.triangles);this.frames=0;this.metricsSince=now;}
+  }
 }

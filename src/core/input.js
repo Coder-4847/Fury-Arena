@@ -10,7 +10,7 @@ export const PLAYER_TWO_KEYS={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',A
 
 export class Input {
   constructor(canvas,options={}) {
-    this.keys=options.keys||KEYS;this.padIndex=options.padIndex||0;this.localVersus=false;
+    this.keys=options.keys||KEYS;this.padIndex=options.padIndex||0;this.localVersus=false;this.gamepadEnabled=options.gamepad!==false;
     this.sources = new Map();
     this.held = new Set();
     this.pressed = new Set();
@@ -52,7 +52,7 @@ export class Input {
   }
   poll(dt) {
     this.time += dt;
-    const pads = [...(navigator.getGamepads?.() || [])].filter(p => p?.connected);
+    const pads = this.gamepadEnabled&&!document.hidden?[...(navigator.getGamepads?.() || [])].filter(p => p?.connected):[];
     this.padCount = pads.length;
     const pad = pads.find(p=>p.index===this.padIndex);
     for (const [button, action] of Object.entries(PAD)) this.set(`pad:${button}`, action, !!pad?.buttons[button]?.pressed, 'gamepad');
@@ -75,11 +75,12 @@ export class Input {
     const root = document.getElementById('touch');
     root.innerHTML = `<div class="touch-move"><button data-action="left" aria-label="Move left">◀</button><button data-action="down" aria-label="Crouch">▼</button><button data-action="right" aria-label="Move right">▶</button><button data-action="jump" aria-label="Jump">↑</button></div><div class="touch-actions">${[['block','GUARD'],['dodge','DODGE'],['light','JAB'],['heavy','HEAVY'],['kick','KICK'],['grab','GRAB'],['special','FURY'],['use','USE'],['drop','DROP']].map(([action,label])=>`<button data-action="${action}" aria-label="${label}">${label}</button>`).join('')}</div>`;
     root.querySelectorAll('button').forEach(button => {
-      const release = event => { this.set(`touch:${event.pointerId}`, button.dataset.action, false); button.classList.remove('active'); };
+      const release = event => { this.set(`touch:${event.pointerId}`, button.dataset.action, false);if(button.dataset.action==='jump')this.set(`touch-climb:${event.pointerId}`,'up',false);button.classList.remove('active'); };
       button.addEventListener('pointerdown', event => {
         event.preventDefault();
         button.setPointerCapture(event.pointerId);
         this.set(`touch:${event.pointerId}`, button.dataset.action, true, 'touch');
+        if(button.dataset.action==='jump')this.set(`touch-climb:${event.pointerId}`,'up',true,'touch');
         button.classList.add('active');
         navigator.vibrate?.(8);
       });
@@ -88,5 +89,5 @@ export class Input {
       button.addEventListener('lostpointercapture', release);
     });
   }
-  showTouch(visible) { document.getElementById('touch').hidden = !(visible && this.touchEnabled); }
+  showTouch(visible) {const active=visible&&this.touchEnabled;document.getElementById('touch').hidden=!active;document.body.classList.toggle('touch-active',active);}
 }

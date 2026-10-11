@@ -17,13 +17,18 @@
   <div id="toast" role="status"></div>
   <div id="error" role="alert" hidden><h1>We couldn’t start the arena.</h1><p id="error-message"></p><button onclick="location.reload()">Try again</button></div>
   <script>
+    function showStartupError(message) {
+      document.getElementById('error').hidden = false;
+      document.getElementById('error-message').textContent = message;
+      document.getElementById('loading').hidden = true;
+    }
     window.addEventListener('error', event => {
       if (!event.message) return;
-      document.getElementById('error').hidden = false;
-      document.getElementById('error-message').textContent = event.message;
-      document.getElementById('loading').hidden = true;
+      showStartupError(event.message);
     });
+    window.addEventListener('unhandledrejection', event => showStartupError(event.reason?.message || 'An unexpected error occurred. Please reload the arena.'));
+    if (location.protocol === 'file:') showStartupError('Run npm start in the project folder, then open http://127.0.0.1:4173. This game needs a static HTTP server.');
   </script>
-  <script type="module" src="./src/main.js"></script>
+  <script type="module" src="./src/main.js" onerror="showStartupError('Game modules could not load. Run npm start and ensure the vendor folder is present.')"></script>
 </body>
 </html>

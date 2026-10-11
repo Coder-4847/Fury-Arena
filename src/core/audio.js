@@ -21,11 +21,20 @@ export class AudioSystem {
     if(name==='special'){this.tone(180,.35,'sawtooth',.08,850);this.tone(70,.25,'sine',.2);}
     if(name==='ko'){this.tone(140,.6,'triangle',.3,35);this.tone(440,.8,'sine',.12,110);}
     if(name==='pickup')this.tone(660,.18,'sine',.14,1100);
+    if(name==='jump')this.tone(180,.09,'sine',.065,280);
+    if(name==='land')this.tone(70,.08,'triangle',.12,30);
+    if(name==='dodge')this.tone(600,.09,'triangle',.035,100);
+    if(name==='pistol'){this.tone(70,.13,'sawtooth',.18,25);this.tone(2100,.035,'square',.08,180);}
+    if(name==='shotgun'){this.tone(60,.24,'sawtooth',.23,20);this.tone(1800,.07,'square',.1,120);}
+    if(name==='throw')this.tone(400,.16,'triangle',.06,100);
+    if(name==='sword'||name==='knife')this.tone(1600,.12,'triangle',.055,300);
+    if(name==='staff')this.tone(340,.13,'triangle',.08,90);
+    if(name==='hammer')this.tone(210,.2,'triangle',.09,50);
   }
   update(dt,active){
     if(!active||!this.context||this.musicVolume===0)return;
     this.nextBeat-=dt;if(this.nextBeat>0)return;this.nextBeat+=.27;
-    const bass=[55,55,65.41,55,73.42,65.41,49,49][Math.floor(this.beat/4)%8];
+    const bass=([55,55,65.41,55,73.42,65.41,49,49][Math.floor(this.beat/4)%8])*(this.bassScale||1);
     if(this.beat%2===0)this.tone(bass,.24,'triangle',this.musicVolume*.18);
     if(this.beat%4===0)this.tone(90,.12,'sine',this.musicVolume*.3,30);
     if(this.beat%4===2)this.tone(1800,.03,'triangle',this.musicVolume*.045,800);
