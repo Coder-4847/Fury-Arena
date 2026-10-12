@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<meta charset="UTF-8">
+<base href="../">
+<title>Fury Arena · arena sheet</title>
+<style>
+  body{margin:0;background:#1d1b17;color:#e7dcc4;font:13px Georgia,serif;padding:10px 14px}
+  select,button{font:14px Georgia;padding:5px 12px;margin:0 6px 8px 0;background:#f4ead5;border:1px solid #8b7552}
+  #sheet{display:grid;grid-template-columns:repeat(2,1fr);gap:4px}
+  #sheet div{position:relative}
+  #sheet canvas{width:100%;display:block;background:#000}
+  #sheet span{position:absolute;left:6px;top:4px;background:rgba(0,0,0,.6);padding:1px 6px;border-radius:3px}
+  #stage{display:none}
+</style>
+<div>
+  <select id="scn"></select> <button id="run">Run</button>
+  <label>every <input id="every" value="4" size="2"> ticks from <input id="from" value="0" size="3"> × <input id="count" value="8" size="2"></label>
+  <span id="note"></span>
+</div>
+<div id="sheet"></div>
+<canvas id="stage" width="1600" height="900"></canvas>
+<script type="module">
+import { InkStage } from './src/ink/stage.js';
+import { InkFighter, resolveInkCombat, InkAI, neutral } from './src/ink/combat.js';
+import { stepSequences } from './src/ink/sequences.js';
+
+const SCENARIOS = {
+  jab:      { script: [[.3, 'light']] },
+  cross:    { script: [[.3, 'light'], [.52, 'light']] },
+  combo:    { script: [[.3, 'light'], [.52, 'light'], [.83, 'light']] },
+  kick:     { script: [[.3, 'kick']] },
+  wheel:    { script: [[.3, 'kick'], [.8, 'kick']] },
+  palm:     { script: [[.3, 'heavy']] },
+  upper:    { hold: [[.2, 1, 'up']], script: [[.3, 'light']] },
+  sweep:    { gap: 108, hold: [[.2, 1.2, 'down']], script: [[.3, 'kick']] },
+  throw:    { gap: 55, script: [[.3, 'grab']] },
+  reap:     { gap: 55, hold: [[.2, 1.5, 'down']], script: [[.3, 'grab']] },
+  spirit:   { script: [[.3, 'special']] },
+  jump:     { script: [[.3, 'jump']] },
+  jumpkick: { script: [[.3, 'jump'], [.5, 'kick']] },
+  dodgeback:{ script: [[.3, 'dodge']] },
+  dodgeroll:{ hold: [[.2, .4, 'right']], script: [[.3, 'dodge']] },
+  walk:     { hold: [[.2, 1.5, 'right']], script: [] },
+  retreat:  { hold: [[.2, 1.5, 'left']], script: [] },
+  duck:     { hold: [[.3, 1, 'down']], script: [] },
+  guard:    { hold: [[.3, 1, 'block']], script: [] },
+  block:    { gap: 100, victimHold: [[0, 3, 'block']], script: [[.3, 'light']] },
+  parry:    { gap: 100, victimAt: [[.38, 'block']], script: [[.3, 'light']] },
+  hit:      { gap: 100, script: [[.3, 'light']] },
+  hitkick:  { gap: 105, script: [[.3, 'kick'], [.8, 'kick']] },
+  knockdown:{ gap: 100, script: [[.3, 'heavy'], [.9, 'special']], ink: 100 },
+  finish:   { gap: 60, victimHealth: 20, script: [[.3, 'use']], ink: 100 },
+  finishlow:{ gap: 60, victimHealth: 20, hold: [[.2, 1, 'down']], script: [[.3, 'use']], ink: 100 }
+};
+const sel = document.getElementById('scn');
+for (const k of Object.keys(SCENARIOS)) sel.append(new Option(k, k));
+const params = new URLSearchParams(location.search);
+sel.value = params.get('s') || 'jab';
+for (const k of ['every', 'from', 'count']) if (params.get(k)) document.getElementById(k).value = params.get(k);
+
+const canvas = document.getElementById('stage');
+const stage = new InkStage(canvas);
+stage.w = 1600; stage.h = 900; stage.dpr = 1; canvas.width = 1600; canvas.height = 900;
+await new Promise(r => setTimeout(r, 400));
+
+function makeInput(holds, presses) {
+  const held = new Set(), queue = new Set();
+  return { held, queue, is: a => held.has(a), consume: a => { if (queue.has(a)) { queue.delete(a); return true; } return false; } };
+}
+
+async function run() {
+  const name = sel.value, sc = SCENARIOS[name];
+  const every = +document.getElementById('every').value, from = +document.getElementById('from').value, count = +document.getElementById('count').value;
+  const half = (sc.gap ?? 160) / 2;
+  const a = new InkFighter(-half, 0), b = new InkFighter(half, 1);
+  a.ink = sc.ink ?? 100; b.ink = 100; if (sc.victimHealth) b.health = sc.victimHealth;
+  const inA = makeInput(), inB = makeInput();
+  const out = document.getElementById('sheet'); out.innerHTML = '';
+  stage.particles = []; stage.after = []; stage.rings = [];
+  const frames = new Set(Array.from({ length: count }, (_, i) => from + i * every));
+  const emit = e => { stage.effect(e); };
+  const total = from + count * every + 2;
+  for (let step = 0; step <= total; step++) {
+    const t = step / 60;
+    inA.held.clear(); inB.held.clear();
+    for (const [s, d, k] of sc.hold || []) if (t >= s && t < s + d) inA.held.add(k);
+    for (const [s, d, k] of sc.victimHold || []) if (t >= s && t < s + d) inB.held.add(k);
+    for (const [s, k] of sc.script || []) if (Math.abs(t - s) < 1 / 120) inA.queue.add(k);
+    for (const [s, k] of sc.victimAt || []) { if (t >= s && t < s + .3) inB.held.add(k); }
+    a.tick(1 / 60, inA, b, emit); b.tick(1 / 60, inB, a, emit);
+    resolveInkCombat([a, b], t, emit);
+    stage.draw([a, b], 1 / 60, { alpha: 1 });
+    if (frames.has(step)) {
+      const cv = document.createElement('canvas');
+      cv.width = 640; cv.height = 480;
+      const mid = (a.x + b.x) / 2 * stage.scale + 800 - stage.camera;
+      cv.getContext('2d').drawImage(canvas, mid - 320, stage.floor - 410, 640, 480, 0, 0, 640, 480);
+      const d = document.createElement('div');
+      d.append(cv);
+      const s = document.createElement('span'); s.textContent = `${t.toFixed(2)}s · ${a.state}/${b.state}`;
+      d.append(s); out.append(d);
+    }
+    await new Promise(r => step % 30 === 0 ? setTimeout(r, 0) : r());
+  }
+  document.getElementById('note').textContent = `A ${a.health} · B ${b.health}`;
+}
+document.getElementById('run').onclick = run;
+await run();
+</script>
+</html>

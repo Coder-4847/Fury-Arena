@@ -29,7 +29,8 @@ Player two: arrows move/duck, numpad 0 jump, 1/2/3 attacks, 4 dodge, 5 throw, 6 
 ## Contents
 
 - One animated shadow martial artist, mirrored opponent.
-- Authored joint rotations keep elbows and knees bending consistently. Strikes load through the hips and shoulders, accelerate into contact, then re-chamber; standing kicks plant the support foot. Damage reach follows the animated fist or foot, with distinct head, body and leg reactions.
+- A real skeleton: pelvis, two-segment spine, head, two-bone arms and legs with fixed bend sides, so a limb can never fold the wrong way. Every move is an authored keyframe clip with anticipation, a snap through contact and a quicker recoil; the hips lead, the shoulders follow and the hands arrive last, so the whole body reads as one chain of weight.
+- Motion has physics on top: planted feet never skate, hits, blocks, parries and landings shove the body into spring-damped overshoot, the headband and sash are verlet cloth that trails real movement, and falls, rolls and get-ups rotate the whole body about its centre and settle on the floor. Damage reach is read from the same clip the renderer plays, so the visible fist or foot is where a strike lands.
 - Thirteen base attacks plus a second throw and two finishers, with move-specific wind-up, contact and recovery poses; footwork, breathing, turning, crouching, jumping, falling, landing compression, guards, rolls, backsteps, stagger, knockdown and recovery.
 - Two original painted sanctuaries: Monastery of Ash and The Moon Garden.
 - Duels (best of three), practice (infinite spirit; still/sparring partner), local two-player, and endurance trials.
@@ -38,7 +39,9 @@ Player two: arrows move/duck, numpad 0 jump, 1/2/3 attacks, 4 dodge, 5 throw, 6 
 
 ## Development
 
-Active entry: `src/ink/main.js`. Combat logic: `src/ink/combat.js`. Paired throw/finisher timelines: `src/ink/sequences.js`. Render interpolation: `src/ink/interpolation.js`. Authored strike motion: `src/ink/motion.js`. Animated silhouette rig: `src/ink/rig.js`. Scenery/effects: `src/ink/stage.js`. Audio: `src/ink/audio.js`. Styles: `ink.css`. Input/fixed loop reuse the shared core modules.
+Animation lives in six small modules. `skeleton.js` is the rig and its solver, `track.js` the keyframe curves, `clips.js` every authored move and reaction, `animator.js` the state machine that blends locomotion, clips and the spring layer, `motion.js` the strike geometry used by combat, and `rig.js` draws the silhouette and cloth. Dev tools: `tools/motion-lab.html` (frame-by-frame sheet of any clip), `tools/arena-sheet.html` (scripted in-engine exchanges rendered through the real stage), `node tools/analyze-motion.mjs` (reach, floor and speed report) and `node tools/pop-audit.mjs` (plays seeded AI fights and reports the biggest single-frame jumps).
+
+Active entry: `src/ink/main.js`. Combat logic: `src/ink/combat.js`. Paired throw/finisher paths (shared by the simulation and the animation): `src/ink/sequences.js`. Render interpolation: `src/ink/interpolation.js`. Scenery/effects: `src/ink/stage.js`. Audio: `src/ink/audio.js`. Styles: `ink.css`. Input/fixed loop reuse the shared core modules.
 
 `npm test` runs the suite, including dedicated 2D combat regressions. The prior 3D implementation and its tests remain as an inactive historical reference; the current page does not import Three.js or the old world/maps/weapons. Do not confuse those legacy tests with validation of the new game.
 
@@ -46,4 +49,4 @@ Active entry: `src/ink/main.js`. Combat logic: `src/ink/combat.js`. Paired throw
 
 Backgrounds are original AI-generated project assets. Fighter silhouettes and motion are code-authored. The supplied screenshot informed composition and mood; no game UI or character sprites were extracted from it. Legacy vendored Three.js retains its MIT license and is not loaded by the 2D version.
 
-Deployment remains pending user playtest confirmation, as requested. GitHub Pages can serve this folder directly: all paths are relative, with no external font or runtime dependencies. No deployment has occurred.
+The game is served by GitHub Pages straight from the repository root: all paths are relative, with no external font or runtime dependencies.

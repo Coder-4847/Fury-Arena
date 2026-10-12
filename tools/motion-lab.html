@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<meta charset="UTF-8">
+<title>Fury Arena · motion lab</title>
+<style>
+  body{margin:0;background:#e7dcc4;color:#27231e;font:15px Georgia,serif;padding:18px 22px}
+  h1{font-weight:400;margin:0 0 8px;font-size:22px}
+  select,button{font:15px Georgia;padding:6px 14px;margin:0 8px 10px 0;background:#f4ead5;border:1px solid #8b7552;color:#28241f}
+  .grid{display:grid;gap:4px;grid-template-columns:repeat(4,1fr)}
+  .frame{text-align:center;border-bottom:1px solid #ac9a78}
+  .frame canvas{width:100%;display:block}
+  .frame p{margin:2px 0 6px;font-size:12px}
+  .contact{background:rgba(190,80,50,.12)}
+  #live{width:100%;max-width:760px;display:block;margin-top:12px;border:1px solid #ac9a78}
+</style>
+<h1>Fury Arena · motion lab</h1>
+<div>
+  <select id="what"></select>
+  <button id="joints">Joints</button>
+  <button id="wide">Live loop</button>
+  <span id="info"></span>
+</div>
+<div class="grid" id="frames"></div>
+<canvas id="live" width="760" height="260" hidden></canvas>
+<script type="module">
+import { InkRig } from '../src/ink/rig.js';
+import { InkFighter, MOVES, neutral } from '../src/ink/combat.js';
+import { beginSequence, stepSequences } from '../src/ink/sequences.js';
+import { strikePoint } from '../src/ink/motion.js';
+import { solve } from '../src/ink/skeleton.js';
+
+const what = document.getElementById('what');
+const groups = {
+  'Attack': Object.keys(MOVES),
+  'Move': ['walk forward', 'walk back', 'crouch', 'crouch walk', 'guard', 'idle'],
+  'Air': ['jump up', 'jump apex', 'jump fall', 'land'],
+  'React': ['hit head', 'hit body', 'hit leg', 'recoil', 'knockdown', 'swept', 'ko', 'rise'],
+  'Dodge': ['dodge back', 'dodge roll'],
+  'Grapple': ['throw', 'reap', 'finish', 'finishLow']
+};
+for (const [g, items] of Object.entries(groups)) {
+  const og = document.createElement('optgroup'); og.label = g;
+  for (const i of items) og.append(new Option(MOVES[i]?.name ? `${MOVES[i].name} (${i})` : i, i));
+  what.append(og);
+}
+what.value = new URLSearchParams(location.search).get('m') || 'jab';
+let joints = false, wide = false;
+document.getElementById('joints').onclick = () => { joints = !joints; build(); };
+document.getElementById('wide').onclick = () => { const l = document.getElementById('live'); l.hidden = !l.hidden; };
+what.onchange = () => { history.replaceState(null, '', `?m=${what.value}`); build(); };
+
+const fresh = (x = 0, id = 0) => { const f = new InkFighter(x, id); f.ink = 100; return f; };
+
+// Produce a fighter-state and a time for frame k of n for the selected clip.
+function describe(name) {
+  if (MOVES[name]) {
+    const m = MOVES[name];
+    const post = m.duration - m.start;
+    const times = [0, m.start * .45, m.start * .8, m.start, m.start + post * .12, m.start + post * .3, m.start + post * .6, m.duration];
+    return { frames: times.map(t => ({ label: `${t.toFixed(2)}s${Math.abs(t - m.start) < 1e-6 ? ' · CONTACT' : ''}`, contact: Math.abs(t - m.start) < 1e-6, f: () => { const f = fresh(); f.start(name); f.attack.t = t; return f; } })), move: m, duration: m.duration };
+  }
+  const N = 8;
+  const mk = (dur, setup) => ({ frames: Array.from({ length: N }, (_, i) => { const t = i / (N - 1) * dur; return { label: `${t.toFixed(2)}s`, f: () => { const f = fresh(); setup(f, t); return f; } }; }), duration: dur });
+  switch (name) {
+    case 'hit head': case 'hit body': case 'hit leg': case 'recoil': {
+      const kind = name === 'recoil' ? 'recoil' : name.split(' ')[1];
+      return mk(.5, (f, t) => { f.state = 'hit'; f.reaction = kind; f.stunTotal = .5; f.clock = t; });
+    }
+    case 'knockdown': return mk(.9, (f, t) => { f.state = 'down'; f.reaction = 'head'; f.clock = t; });
+    case 'swept': return mk(.9, (f, t) => { f.state = 'down'; f.reaction = 'leg'; f.clock = t; });
+    case 'ko': return mk(1.3, (f, t) => { f.state = 'ko'; f.clock = t; });
+    case 'rise': return mk(.5, (f, t) => { f.state = 'rise'; f.clock = t; });
+    case 'dodge back': return mk(.46, (f, t) => { f.state = 'dodge'; f.dodgeDir = -f.facing; f.clock = t; });
+    case 'dodge roll': return mk(.46, (f, t) => { f.state = 'dodge'; f.dodgeDir = f.facing; f.clock = t; });
+    case 'jump up': return mk(.01, (f) => { f.grounded = false; f.y = 40; f.vy = 600; f.state = 'jump'; });
+    case 'jump apex': return mk(.01, (f) => { f.grounded = false; f.y = 150; f.vy = 20; f.state = 'jump'; });
+    case 'jump fall': return mk(.01, (f) => { f.grounded = false; f.y = 40; f.vy = -600; f.state = 'fall'; });
+    case 'land': return mk(.16, (f, t) => { f.landTime = .16 - t; f.landPower = 1; });
+    case 'guard': return mk(1, (f) => { f.guard = true; f.state = 'guard'; });
+    case 'crouch': return mk(1, (f) => { f.duck = true; f.state = 'duck'; });
+    case 'idle': return mk(2.4, () => {});
+    default: return null;
+  }
+}
+
+function drawFrame(canvas, poseOrFighters, opts = {}) {
+  const c = canvas.getContext('2d');
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, canvas.width, canvas.height);
+  const sc = canvas.width / 260 * (opts.zoom || 1);
+  c.scale(sc, sc);
+  const groundY = canvas.height / sc - 30;
+  c.strokeStyle = '#a58d69'; c.lineWidth = 1; c.beginPath(); c.moveTo(0, groundY + .5); c.lineTo(canvas.width / sc, groundY + .5); c.stroke();
+  for (const item of poseOrFighters) {
+    const { rig, f, x = canvas.width / sc / 2, y = 0 } = item;
+    c.save();
+    c.translate(x, groundY - y);
+    c.scale(f.facing, 1);
+    const p = rig.current;
+    rig.paint(c, p, f, 0, 0, 0, 0, false, true);
+    if (joints) {
+      for (const k of ['frontShoulder', 'backShoulder', 'frontElbow', 'backElbow', 'frontKnee', 'backKnee', 'frontFoot', 'backFoot', 'hip', 'waist', 'neck']) {
+        c.fillStyle = k.includes('Elbow') ? '#c45d38' : k.includes('Knee') ? '#2d6aa8' : '#2a8a4f';
+        c.beginPath(); c.arc(p[k][0], p[k][1], 2.4, 0, 6.3); c.fill();
+      }
+    }
+    if (item.strike) {
+      c.strokeStyle = '#d02c1d'; c.lineWidth = 1.2;
+      const [sx, sy] = item.strike;
+      c.beginPath(); c.moveTo(sx - 6, sy); c.lineTo(sx + 6, sy); c.moveTo(sx, sy - 6); c.lineTo(sx, sy + 6); c.stroke();
+    }
+    c.restore();
+  }
+}
+
+const walkClip = (dir, duck) => {
+  const rig = new InkRig(), f = fresh();
+  const frames = [], N = 8, speed = duck ? 85 : 245, dt = 1 / 60;
+  f.duck = duck; f.state = duck ? 'duck' : 'walk';
+  let x = 0;
+  // warm up so the blend weights settle, then capture one cycle
+  const total = 90 + N * 9;
+  for (let i = 0; i < total; i++) {
+    x += dir * speed * dt; f.vx = dir * speed * f.facing;
+    rig.advance(f, i * dt, dt, x);
+    if (i >= 90 && (i - 90) % 9 === 0) frames.push({ rig: Object.assign(Object.create(Object.getPrototypeOf(rig)), rig, { current: rig.current }), label: `step ${frames.length + 1}` });
+  }
+  return frames;
+};
+
+let raf = 0, liveState = null;
+function build() {
+  const name = what.value;
+  const holder = document.getElementById('frames');
+  holder.innerHTML = '';
+  cancelAnimationFrame(raf);
+  const info = document.getElementById('info');
+  const add = (label, contact) => {
+    const d = document.createElement('div'); d.className = 'frame' + (contact ? ' contact' : '');
+    d.innerHTML = `<canvas width="520" height="460"></canvas><p>${label}</p>`;
+    holder.append(d); return d.firstChild;
+  };
+  if (['walk forward', 'walk back', 'crouch walk'].includes(name)) {
+    const dir = name === 'walk back' ? -1 : 1, duck = name === 'crouch walk';
+    for (const fr of walkClip(dir, duck)) { const f = fresh(); f.duck = duck; drawFrame(add(fr.label), [{ rig: fr.rig, f }]); }
+    info.textContent = 'one gait cycle, 6 frames apart at 60 fps';
+    return;
+  }
+  if (groups.Grapple.includes(name)) {
+    const a = fresh(-35, 0), b = fresh(35, 1), ra = new InkRig(), rb = new InkRig();
+    if (name.startsWith('finish')) b.health = 25;
+    beginSequence(a, b, name);
+    const s = a.sequence, steps = 12, per = Math.ceil(s.duration * 60 / steps);
+    for (let i = 0; i <= steps; i++) {
+      const tt = a.sequence ? a.sequence.t : s.duration;
+      ra.current = solve(ra.animator.step(a, 0, 0, a.x)); rb.current = solve(rb.animator.step(b, 0, 0, b.x));
+      const cv = add(`${tt.toFixed(2)}s`, a.sequence && tt >= (s.kind === 'reap' ? .67 : s.finish ? 1.5 : .8) && tt < (s.kind === 'reap' ? .67 : s.finish ? 1.5 : .8) + per / 60);
+      drawFrame(cv, [{ rig: ra, f: a, x: 200 + a.x * 1, y: a.y }, { rig: rb, f: b, x: 200 + b.x * 1, y: b.y }], { zoom: .62 });
+      for (let k = 0; k < per; k++) { stepSequences([a, b], 1 / 60); a.tick(1 / 60, neutral, b); b.tick(1 / 60, neutral, a); }
+    }
+    info.textContent = `${name}: grip → lift → slam`;
+    return;
+  }
+  const d = describe(name);
+  if (!d) return;
+  const rigs = [];
+  d.frames.forEach(fr => {
+    const rig = new InkRig(), f = fr.f();
+    rig.current = rig.sample(f, 0);
+    const item = { rig, f };
+    if (d.move && fr.contact) { const p = rig.current; item.strike = strikePoint(d.move, d.move.start); }
+    drawFrame(add(fr.label, fr.contact), [item]);
+  });
+  info.textContent = d.move ? `contact ${d.move.start}s · active to ${d.move.end}s · total ${d.duration}s · reach ${strikePoint(d.move, d.move.start).map(v => v.toFixed(0)).join(', ')}` : '';
+  // live loop
+  const live = document.getElementById('live');
+  const rig = new InkRig();
+  let t0 = null, last = 0;
+  const loop = ts => {
+    t0 ??= ts;
+    const t = ((ts - t0) / 1000) % (d.duration + .5);
+    const dt = (ts - last) / 1000; last = ts;
+    const f = d.frames[0].f();
+    if (d.move) { f.attack.t = Math.min(t, d.duration); }
+    else if (f.state === 'hit') { f.clock = Math.min(t, d.duration); }
+    else if (['down', 'ko', 'rise', 'dodge'].includes(f.state)) { f.clock = Math.min(t, d.duration); }
+    rig.advance(f, ts / 1000, Math.min(dt, .05), 0);
+    drawFrame(live, [{ rig, f, x: 130 }]);
+    raf = requestAnimationFrame(loop);
+  };
+  raf = requestAnimationFrame(loop);
+}
+build();
+</script>
+</html>
