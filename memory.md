@@ -33,7 +33,7 @@ A/D or arrows move, S/down duck, Space jump, J fist (three hit-confirm chain), K
 - User playtest: subjective feel of impact weight and the new hit/knockdown/get-up timings, mirrored animations, physical phone multi-touch, controller mappings, sustained performance.
 - Ideas not done: jump anticipation squat (would need a sim delay), stomp dust on lunging steps, per-move variation of knockdown flight by damage, victory/defeat poses, a real turn-around pivot instead of the squeeze.
 - Use `?keyboard-only` for browser QA to avoid connected controller input; add `&debug` for `window.__fury`.
-- Checkpoints: 3346869 (3D), 064e2b9 (2D rebuild), 6f396f0 (throws/finishers), c01831c (anatomical strikes), then the animation overhaul commit that follows c97d186.
+- Checkpoints: 3346869 (3D), 064e2b9 (2D rebuild), 6f396f0 (throws/finishers), c01831c (anatomical strikes), then a6216ab (animation overhaul, live on GitHub Pages as of 2026-10-12). A stale browser cache can briefly mix old and new modules after a deploy (Pages caches for 10 minutes); hard-reload if the page reports a missing export.
 
 ## Repo and delivery
 Remote `origin` is https://github.com/Coder-4847/Fury-Arena.git; local branch `master` tracks `origin/main`, so publish with `git push origin master:main`. `.nojekyll` is present and all paths are relative; GitHub Pages serves the repository root, live at https://coder-4847.github.io/Fury-Arena/. After pushing, load the live URL and confirm the new modules are served (`src/ink/skeleton.js`, `animator.js`, `clips.js`, `track.js`) and the game starts.
